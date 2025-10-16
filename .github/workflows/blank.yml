@@ -8,17 +8,16 @@ on:
   workflow_dispatch:
     inputs:
       keyboard:
-        description: nice_nano_v2
+        description: '键盘型号（如 nice_nano_v2）'
         required: false
         default: 'all'
-
 jobs:
-  build-firmware:
+  build:
     uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
     with:
       config-dir: config
-      verbosity: debug
+      verbosity: info
       keyboard: ${{ github.event.inputs.keyboard }}
     permissions:
-      contents: read 
-      actions: write 
+      contents: read
+      actions: write
