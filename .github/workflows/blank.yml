@@ -15,7 +15,7 @@ on:
     # 手动触发时可选择键盘配置（可选，按需添加）
     inputs:
       keyboard:
-        description: '键盘型号（如 nice_nano_v2）'
+        description: nice_nano_v2
         required: false
         default: 'all'
 
