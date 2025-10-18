@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   # 第一步：复用官方工作流编译固件
   build-firmware:
-    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
+    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@2.5.0 
     with:
       config-file: config/bt75_v1.conf  # 你的配置文件路径
 
