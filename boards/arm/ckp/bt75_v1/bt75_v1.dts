@@ -1,0 +1,19 @@
+/dts-v1/;
+#include <nrf52840.dtsi>  # 替换为你的芯片型号（如 nrf52833、stm32f411 等）
+
+/ {
+    model = "bt75_v1";
+    compatible = "bt75_v1";
+
+    chosen {
+        zephyr,console = &uart0;
+        zephyr,shell-uart = &uart0;
+        zephyr,uart-mcumgr = &uart0;
+    };
+};
+
+&uart0 {  # 示例：配置 UART 引脚，根据你的硬件修改
+    pinctrl-0 = <&uart0_tx_pin &uart0_rx_pin>;
+    pinctrl-names = "default";
+    status = "okay";
+};
