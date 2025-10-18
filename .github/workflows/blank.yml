@@ -5,98 +5,53 @@ jobs:
   build-firmware:
     runs-on: ubuntu-latest
     steps:
-      # 步骤1：拉取 ZMK 官方源码
+      # 步骤1：拉取 ZMK 官方源码（确保包含 west.yml）
       - name: Checkout ZMK Source Code
         uses: actions/checkout@v4
         with:
           repository: zmkfirmware/zmk
-          path: zmk
-          ref: main  # 可替换为稳定版本，如 v2.5.0
-          fetch-depth: 0  # 拉取完整历史，确保依赖正常
+          path: ./zmk  # 明确克隆到当前工作目录的 zmk 文件夹
+          ref: main
+          fetch-depth: 1  # 改为 1 尝试轻量拉取（若仍失败可删除此句）
 
-      # 步骤2：拉取你的配置文件（存放 config 目录的仓库）
+      # 验证 ZMK 源码中是否存在 west.yml（新增调试步骤）
+      - name: Verify west.yml exists in ZMK repo
+        run: |
+          echo "检查 ZMK 目录文件列表："
+          ls -la ./zmk  # 列出 zmk 目录下的文件，确认 west.yml 存在
+          if [ ! -f "./zmk/west.yml" ]; then
+            echo "错误：zmk 目录中未找到 west.yml！"
+            exit 1
+          fi
+
+      # 步骤2：拉取用户配置
       - name: Checkout User Configuration
         uses: actions/checkout@v4
         with:
-          path: user-config  # 配置文件会被克隆到 user-config 目录
-          fetch-depth: 1  # 仅拉取最新版本，加快速度
+          path: ./user-config
+          fetch-depth: 1
 
-      # 步骤3：安装编译依赖（包括 west 工具）
+      # 步骤3：安装依赖
       - name: Install Build Dependencies
         run: |
-          # 更新系统包列表
           sudo apt update -y
-          # 安装 Python 及包管理工具（west 依赖）
           sudo apt install -y python3 python3-pip python3-venv
-          # 安装 west 工具（ZMK/Zephyr 管理工具）
           pip3 install west
-          # 验证 west 安装成功
-          west --version
-          # 安装其他编译依赖（如编译器、make 等）
           sudo apt install -y gcc gcc-multilib g++-multilib build-essential cmake ninja-build
 
-      # 步骤4：初始化 ZMK 环境并编译固件
+      # 步骤4：初始化并编译
       - name: Initialize ZMK and Build Firmware
         run: |
-          # 进入 ZMK 源码目录
-          cd zmk
-          # 初始化 west 环境（关联 Zephyr 内核）
-          west init -l .
-          # 拉取所有依赖模块（Zephyr 内核、驱动等）
-          west update
-          # 编译固件：
-          # -s app：指定编译目标为 ZMK 应用
-          # -b bt75_v1：指定板型为 bt75_v1
-          # -DZMK_CONFIG：指定你的配置文件目录
-          # -DBOARD_ROOT：指定板型文件所在的额外目录（ckp 子目录）
+          cd ./zmk  # 明确进入正确的 zmk 目录
+          west init -l .  # 基于当前目录的 west.yml 初始化
+          west update  # 拉取依赖（这一步会生成完整的项目结构）
           west build -s app -b bt75_v1 \
                     -- -DZMK_CONFIG=../user-config/config \
                        -DBOARD_ROOT=${PWD}/boards/arm/ckp
 
-      # 步骤5：上传编译好的固件（供打包步骤使用）
+      # 步骤5：上传产物
       - name: Upload Firmware Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-output  # 产物名称，需与打包步骤一致
-          path: |
-            zmk/build/zephyr/*.uf2  # 常见的固件格式（适用于多数键盘）
-            zmk/build/zephyr/*.bin  # 备用格式，防止 uf2 未生成
-          if-no-files-found: error  # 若未找到固件，标记为错误
-
-  # 打包步骤：依赖编译步骤成功完成
-  package-firmware:
-    needs: build-firmware
-    runs-on: ubuntu-latest
-    steps:
-      # 步骤1：下载编译步骤生成的固件
-      - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
-        with:
           name: build-output
-          path: build  # 下载到本地 build 目录
-
-      # 步骤2：检查固件文件是否存在（调试用）
-      - name: Verify Firmware Files
-        run: |
-          echo "===== 固件文件列表 ====="
-          ls -R build
-          echo "========================"
-          # 若未找到固件，手动报错
-          if [ -z "$(ls -A build)" ]; then
-            echo "错误：未找到固件文件！"
-            exit 1
-          fi
-
-      # 步骤3：打包固件（压缩为 zip 方便下载）
-      - name: Package Firmware
-        run: |
-          mkdir -p firmware-package
-          cp -r build/* firmware-package/
-          zip -r zmk-firmware-${{ github.sha }}.zip firmware-package/
-
-      # 步骤4：上传打包后的固件（作为最终产物）
-      - name: Upload Packaged Firmware
-        uses: actions/upload-artifact@v4
-        with:
-          name: zmk-firmware-package
-          path: zmk-firmware-${{ github.sha }}.zip
+          path: ./zmk/build/zephyr/*.uf2
