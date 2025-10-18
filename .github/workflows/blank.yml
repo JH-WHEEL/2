@@ -1,65 +1,68 @@
-name: Build ZMK Firmware (Guaranteed west)
+name: Build ZMK Firmware (Fixed Clone)
 on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. 拉取ZMK官方源码（确保含west.yml）
+      # 1. 拉取ZMK官方源码（修正git clone命令格式）
       - name: 拉取ZMK官方源码
         run: |
+          # 修正URL与路径间的空格，确保克隆完整
           git clone --depth 1 https://github.com/zmkfirmware/zmk.git ./zmk
-          # 验证west.yml存在
+          
+          # 验证仓库克隆成功且包含west.yml
+          echo "查看zmk目录内容："
+          ls -la ./zmk
+          
           if [ ! -f "./zmk/west.yml" ]; then
-            echo "❌ 官方源码中未找到west.yml"
+            echo "❌ 错误：zmk目录中未找到west.yml"
             exit 1
           fi
-          echo "✅ 已获取west.yml"
+          echo "✅ 成功获取west.yml"
 
-      # 2. 拉取你的自定义板型和配置
+      # 2. 拉取自定义板型和配置
       - name: 拉取自定义文件
         uses: actions/checkout@v4
         with:
           path: custom-files
           fetch-depth: 1
 
-      # 3. 注入自定义板型到ZMK目录
+      # 3. 注入自定义板型
       - name: 注入板型文件
         run: |
           mkdir -p ./zmk/boards/arm
           cp -r custom-files/boards/arm/ckp ./zmk/boards/arm/
+          
           if [ ! -d "./zmk/boards/arm/ckp/bt75_v1" ]; then
-            echo "❌ 未找到bt75_v1板型文件"
+            echo "❌ 错误：未找到bt75_v1板型文件"
             exit 1
           fi
           echo "✅ 板型文件注入成功"
 
-      # 4. 强制安装west并验证版本
-      - name: 安装并验证west
+      # 4. 安装并验证west
+      - name: 安装west工具
         run: |
-          # 强制安装最新版west
           pip3 install --upgrade west
-          # 验证west是否安装成功（关键步骤）
+          
+          # 验证west命令可执行
           if ! command -v west &> /dev/null; then
-            echo "❌ west未安装成功"
+            echo "❌ 错误：west未安装成功"
             exit 1
           fi
-          # 打印west版本，确认可用
           west --version
           echo "✅ west安装验证成功"
 
-      # 5. 初始化ZMK环境（依赖west）
-      - name: 初始化ZMK环境
+      # 5. 初始化ZMK环境
+      - name: 初始化环境
         run: |
           cd ./zmk
-          # 用west初始化（指定当前目录的west.yml）
           west init -l .
-          # 拉取依赖（这一步会用到west）
           west update
-          echo "✅ ZMK环境初始化完成"
+          echo "✅ 环境初始化完成"
 
       # 6. 编译固件
-      - name: 编译bt75_v1固件
+      - name: 编译固件
         run: |
           cd ./zmk
           west build -s app -b bt75_v1 \
