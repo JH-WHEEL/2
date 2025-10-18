@@ -1,9 +1,15 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: Build ZMK Firmware
+on: [push, pull_request]
+
+jobs:
+  build:
+    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
+    with:
+      config-file: config/bt75_v1.conf  # 替换为你的配置文件路径
 
 # Controls when the workflow will run
-on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main" ]
