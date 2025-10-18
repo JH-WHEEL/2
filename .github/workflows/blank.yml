@@ -1,36 +1,43 @@
-# This is a basic workflow to help you get started with Actions
+name: Build and Package ZMK Firmware
 
-name: CI
+on: [push, pull_request]
 
-# Controls when the workflow will run
-on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+  # 第一步：复用官方工作流编译固件
+  build-firmware:
+    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
+    with:
+      config-file: config/bt75_v1.conf  # 你的配置文件路径
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
+  # 第二步：在官方编译完成后，执行打包步骤（依赖第一步成功）
+  package-firmware:
+    needs: build-firmware  # 确保先完成编译
+    runs-on: ubuntu-latest  # 必须指定运行环境
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      # 步骤1：下载官方编译产生的固件（build-output 是官方默认 artifacts 名称）
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: build  # 下载到本地 build 目录
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      # 步骤2：检查固件是否存在（调试用）
+      - name: Check firmware files
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          echo "固件文件列表："
+          ls -R build
+
+      # 步骤3：压缩固件
+      - name: Compress firmware
+        run: |
+          mkdir -p firmware_zip
+          cp build/*.uf2 firmware_zip/  # 复制所有 .uf2 固件（根据实际类型调整）
+          zip -r zmk_firmware.zip firmware_zip/
+
+      # 步骤4：上传压缩包
+      - name: Upload firmware zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: zmk-firmware-pack
+          path: zmk_firmware.zip
+          retention-days: 30
