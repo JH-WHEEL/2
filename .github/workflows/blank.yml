@@ -5,43 +5,36 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. 拉取你的仓库（名称为"2"，所有文件都会下载到 custom-files 目录）
       - name: 拉取你的仓库（名称2）
         uses: actions/checkout@v4
         with:
-          path: custom-files  # 你的仓库内容会存放在这个目录下
+          path: custom-files
           fetch-depth: 1
 
-      # 2. 验证你仓库中是否有手动上传的 west.yml
       - name: 检查 west.yml 是否存在
         run: |
           if [ ! -f "custom-files/west.yml" ]; then
-            echo "❌ 错误：你的仓库（名称2）根目录未找到 west.yml，请手动上传"
+            echo "❌ 错误：你的仓库根目录未找到 west.yml，请手动上传"
             exit 1
           fi
-          echo "✅ 已找到你仓库中的 west.yml"
+          echo "✅ 已找到 west.yml"
 
-      # 3. 创建本地编译目录（用"build-zmk"命名，避免与仓库名混淆）
       - name: 准备本地编译目录
         run: |
           mkdir -p ./build-zmk
-          # 将你仓库中的 west.yml 复制到编译目录
           cp custom-files/west.yml ./build-zmk/
           echo "✅ 编译目录准备完成"
 
-      # 4. 注入你的自定义板型文件（从仓库"2"复制到编译目录）
       - name: 注入板型文件
         run: |
           mkdir -p ./build-zmk/boards/arm
           cp -r custom-files/boards/arm/ckp ./build-zmk/boards/arm/
-          
           if [ ! -d "./build-zmk/boards/arm/ckp/bt75_v1" ]; then
-            echo "❌ 错误：你的仓库中未找到 bt75_v1 板型文件"
+            echo "❌ 错误：未找到 bt75_v1 板型文件"
             exit 1
           fi
           echo "✅ 板型文件注入成功"
 
-      # 5. 安装并验证 west 工具
       - name: 安装 west 工具
         run: |
           pip3 install --upgrade west
@@ -52,23 +45,19 @@ jobs:
           west --version
           echo "✅ west 工具可用"
 
-      # 6. 初始化 ZMK 环境并拉取依赖
       - name: 初始化 ZMK 环境
         run: |
           cd ./build-zmk
-          west init -l .  # 基于编译目录中的 west.yml 初始化
+          west init -l .
           west update
           echo "✅ ZMK 环境初始化完成"
 
-      # 7. 编译固件（指定你的配置文件路径）
       - name: 编译 bt75_v1 固件
         run: |
           cd ./build-zmk
-          west build -s app -b bt75_v1 \
-                    -- -DZMK_CONFIG=../custom-files/config  # 你的配置文件在仓库"2"中
+          west build -s app -b bt75_v1 -- -DZMK_CONFIG=../custom-files/config
           echo "✅ 固件编译完成"
 
-      # 8. 上传编译好的固件
       - name: 上传固件
         uses: actions/upload-artifact@v4
         with:
