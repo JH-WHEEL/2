@@ -1,28 +1,57 @@
 name: Build and Package ZMK Firmware
-
 on: [push, pull_request]
 
 jobs:
-  # 第一步：复用官方工作流编译固件
+  # 第一步：手动编译固件（不再复用工作流）
   build-firmware:
-    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
-    with:
-      config_path: config # 你的配置文件路径
-      cmake_args: "-DBOARD_ROOT=boards/arm/ckp"
-
-  # 第二步：在官方编译完成后，执行打包步骤（依赖第一步成功）
-  package-firmware:
-    needs: build-firmware  # 确保先完成编译
-    runs-on: ubuntu-latest  # 必须指定运行环境
+    runs-on: ubuntu-latest
     steps:
-      # 步骤1：下载官方编译产生的固件（build-output 是官方默认 artifacts 名称）
+      # 步骤1：拉取 ZMK 官方源码
+      - name: Checkout ZMK
+        uses: actions/checkout@v4
+        with:
+          repository: zmkfirmware/zmk
+          path: zmk
+          ref: main
+          fetch-depth: 0
+
+      # 步骤2：拉取你的配置文件（含 bt75_v1.conf 等）
+      - name: Checkout User Config
+        uses: actions/checkout@v4
+        with:
+          path: user-config
+          fetch-depth: 1
+
+      # 步骤3：初始化 ZMK 环境并编译
+      - name: Build Firmware
+        run: |
+          cd zmk
+          # 初始化 west 环境
+          west init -l .
+          west update
+          # 编译：指定板型、配置目录、板型搜索路径（关键）
+          west build -s app -b bt75_v1 \
+                    -- -DZMK_CONFIG=../user-config/config \  # 你的配置目录
+                       -DBOARD_ROOT=${PWD}/boards/arm/ckp  # 板型所在的 ckp 目录
+
+      # 步骤4：上传编译产物（供后续打包用）
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: zmk/build/zephyr/*.uf2  # 固件路径（根据实际输出调整）
+
+  # 第二步：打包步骤（无需修改，依赖上面的 build-firmware）
+  package-firmware:
+    needs: build-firmware
+    runs-on: ubuntu-latest
+    steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-output
-          path: build  # 下载到本地 build 目录
-
-      # 步骤2：检查固件是否存在（调试用）
+          path: build
+      
       - name: Check firmware files
         run: |
           echo "固件文件列表："
