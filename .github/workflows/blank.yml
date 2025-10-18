@@ -1,40 +1,34 @@
-name: Build ZMK Firmware (Fixed Clone)
+name: Build ZMK Firmware for Your Repo
 on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. 拉取ZMK官方源码（修正git clone命令格式）
-      - name: 拉取ZMK官方源码
-        run: |
-          # 修正URL与路径间的空格，确保克隆完整
-          git clone --depth 1 https://github.com/zmkfirmware/zmk.git ./zmk
-          
-          # 验证仓库克隆成功且包含west.yml
-          echo "查看zmk目录内容："
-          ls -la ./zmk
-          
-          if [ ! -f "./zmk/west.yml" ]; then
-            echo "❌ 错误：zmk目录中未找到west.yml"
-            exit 1
-          fi
-          echo "✅ 成功获取west.yml"
-
-      # 2. 拉取自定义板型和配置
-      - name: 拉取自定义文件
+      # 1. 拉取你的仓库（含手动上传的west.yml）
+      - name: 拉取仓库（含west.yml）
         uses: actions/checkout@v4
         with:
           path: custom-files
           fetch-depth: 1
 
+      # 2. 移动west.yml到自定义目录（这里命名为"my-zmk"，可根据需求修改）
+      - name: 移动west.yml到正确路径
+        run: |
+          mkdir -p ./2
+          cp custom-files/west.yml ./2/
+          if [ ! -f "./2/west.yml" ]; then
+            echo "❌ 错误：west.yml未移动成功"
+            exit 1
+          fi
+          echo "✅ west.yml已移动到2目录"
+
       # 3. 注入自定义板型
       - name: 注入板型文件
         run: |
-          mkdir -p ./zmk/boards/arm
-          cp -r custom-files/boards/arm/ckp ./zmk/boards/arm/
-          
-          if [ ! -d "./zmk/boards/arm/ckp/bt75_v1" ]; then
+          mkdir -p ./2/boards/arm
+          cp -r custom-files/boards/arm/ckp ./2/boards/arm/
+          if [ ! -d "./2/boards/arm/ckp/bt75_v1" ]; then
             echo "❌ 错误：未找到bt75_v1板型文件"
             exit 1
           fi
@@ -44,8 +38,6 @@ jobs:
       - name: 安装west工具
         run: |
           pip3 install --upgrade west
-          
-          # 验证west命令可执行
           if ! command -v west &> /dev/null; then
             echo "❌ 错误：west未安装成功"
             exit 1
@@ -56,7 +48,7 @@ jobs:
       # 5. 初始化ZMK环境
       - name: 初始化环境
         run: |
-          cd ./zmk
+          cd ./2
           west init -l .
           west update
           echo "✅ 环境初始化完成"
@@ -64,7 +56,7 @@ jobs:
       # 6. 编译固件
       - name: 编译固件
         run: |
-          cd ./zmk
+          cd ./2
           west build -s app -b bt75_v1 \
                     -- -DZMK_CONFIG=../custom-files/config
           echo "✅ 固件编译完成"
@@ -74,4 +66,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bt75_v1-firmware
-          path: ./zmk/build/zephyr/*.uf2
+          path: ./2/build/zephyr/*.uf2
