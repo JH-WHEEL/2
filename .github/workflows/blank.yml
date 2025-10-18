@@ -5,61 +5,48 @@ jobs:
   build-firmware:
     runs-on: ubuntu-latest
     steps:
-      # 1. 拉取ZMK官方源码（含west.yml核心文件）
-      - name: Checkout ZMK Official Source
-        uses: actions/checkout@v4
-        with:
-          repository: zmkfirmware/zmk
-          path: zmk
-          ref: main
-          fetch-depth: 0
+      # 步骤1：创建并进入 zmk 目录，下载官方 west.yml
+      - name: 初始化 ZMK 目录并下载 west.yml
+        run: |
+          mkdir -p zmk
+          cd zmk
+          curl -O https://raw.githubusercontent.com/zmkfirmware/zmk/main/west.yml
+          ls -la  # 验证 west.yml 存在
 
-      # 2. 拉取你的仓库（含ckp板型和config配置）
-      - name: Checkout Custom Files
+      # 步骤2：拉取你的自定义板型和配置
+      - name: 拉取自定义文件
         uses: actions/checkout@v4
         with:
-          # 替换为你的仓库地址（如your-username/your-repo）
-          repository: ${{ github.repository }}
           path: custom-files
           fetch-depth: 1
 
-      # 3. 将自定义ckp板型注入官方源码
-      - name: Inject Custom Board (ckp)
+      # 步骤3：注入自定义板型到 zmk 目录
+      - name: 注入自定义板型 (ckp)
         run: |
-          # 创建官方板型目录（若不存在）
           mkdir -p zmk/boards/arm
-          # 复制你的ckp目录到官方源码（包含bt75_v1板型）
           cp -r custom-files/boards/arm/ckp zmk/boards/arm/
-          # 验证板型文件是否存在
-          if [ ! -d "zmk/boards/arm/ckp/bt75_v1" ]; then
-            echo "错误：未找到bt75_v1板型文件！"
-            exit 1
-          fi
+          ls -la zmk/boards/arm/ckp/bt75_v1  # 验证板型文件
 
-      # 4. 安装编译依赖（含west工具）
-      - name: Install Dependencies
+      # 步骤4：安装依赖（含 west 工具）
+      - name: 安装依赖
         run: |
           sudo apt update -y
           sudo apt install -y python3 python3-pip build-essential cmake ninja-build
           pip3 install west
-          west --version  # 验证安装
+          west --version
 
-      # 5. 初始化ZMK环境并编译固件
-      - name: Build Firmware
+      # 步骤5：编译固件
+      - name: 构建固件
         run: |
           cd zmk
-          # 初始化west（依赖官方源码的west.yml）
-          west init -l .
-          west update  # 拉取Zephyr内核等依赖
-          # 编译bt75_v1板型，指定你的配置目录
+          west init -l .  # 基于当前目录的 west.yml 初始化
+          west update
           west build -s app -b bt75_v1 \
                     -- -DZMK_CONFIG=../custom-files/config
 
-      # 6. 上传生成的固件（UF2和BIN格式）
-      - name: Upload Firmware
+      # 步骤6：上传固件
+      - name: 上传固件
         uses: actions/upload-artifact@v4
         with:
           name: bt75_v1-firmware
-          path: |
-            zmk/build/zephyr/*.uf2
-            zmk/build/zephyr/*.bin
+          path: zmk/build/zephyr/*.uf2
