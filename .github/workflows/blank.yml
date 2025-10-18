@@ -10,34 +10,29 @@ jobs:
           path: custom-files
           fetch-depth: 1
 
-      - run: |
-          if [ ! -f "custom-files/west.yml" ]; then
-            echo "Error: west.yml not found"
-            exit 1
-          fi
-          mkdir -p ./build-zmk
-          cp custom-files/west.yml ./build-zmk/
-          mkdir -p ./build-zmk/boards/arm
-          cp -r custom-files/boards/arm/ckp ./build-zmk/boards/arm/
-          if [ ! -d "./build-zmk/boards/arm/ckp/bt75_v1" ]; then
-            echo "Error: bt75_v1 board missing"
-            exit 1
-          fi
-        name: Prepare files
-
-      - run: |
-          pip3 install --upgrade west
-          west --version
-        name: Install west
-
-      - run: |
-          cd ./build-zmk
+      - name: Initialize ZMK Repo
+        run: |
+          git clone --depth 1 https://github.com/zmkfirmware/zmk.git ./zmk
+          cd ./zmk
           west init -l .
           west update
-          west build -s app -b bt75_v1 -- -DZMK_CONFIG=../custom-files/config
-        name: Build firmware
 
-      - uses: actions/upload-artifact@v4
+      - name: Inject Custom Board and Config
+        run: |
+          # 注入板型文件
+          mkdir -p ./zmk/app/boards/arm/ckp/bt75_v1
+          cp -r custom-files/boards/arm/ckp/bt75_v1/* ./zmk/app/boards/arm/ckp/bt75_v1/
+          # 注入配置和键位映射
+          mkdir -p ./zmk/config
+          cp -r custom-files/config/* ./zmk/config/
+
+      - name: Build Firmware
+        run: |
+          cd ./zmk
+          west build -s app -b bt75_v1 -- -DZMK_CONFIG=../config
+
+      - name: Upload Firmware
+        uses: actions/upload-artifact@v4
         with:
           name: bt75_v1-firmware
-          path: ./build-zmk/build/zephyr/*.uf2
+          path: ./zmk/build/zephyr/*.uf2
